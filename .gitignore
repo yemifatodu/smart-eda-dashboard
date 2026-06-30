@@ -70,3 +70,7 @@ logs/
 # Temporary files
 *.tmp
 *.temp
+
+# Local user store / secrets - never commit, even though it's JSON
+data/users.json
+.env
