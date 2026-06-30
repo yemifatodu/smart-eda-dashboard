@@ -1,0 +1,102 @@
+import streamlit as st
+import pandas as pd
+import numpy as np
+from pathlib import Path
+import time
+
+# Page configuration - MUST be first Streamlit command
+st.set_page_config(
+    page_title="Smart EDA & Auto-ML Dashboard",
+    page_icon="📊",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# Custom CSS for better styling
+st.markdown("""
+<style>
+    .main-header {
+        font-size: 2.5rem;
+        color: #1f77b4;
+        text-align: center;
+        padding: 1rem 0;
+    }
+    .metric-card {
+        background-color: #f0f2f6;
+        padding: 1rem;
+        border-radius: 0.5rem;
+        border-left: 4px solid #1f77b4;
+    }
+    .stButton > button {
+        width: 100%;
+        background-color: #1f77b4;
+        color: white;
+    }
+    .stButton > button:hover {
+        background-color: #2c8cdb;
+        color: white;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# Initialize session state
+if 'data' not in st.session_state:
+    st.session_state.data = None
+if 'processed_data' not in st.session_state:
+    st.session_state.processed_data = None
+if 'model_results' not in st.session_state:
+    st.session_state.model_results = None
+if 'eda_results' not in st.session_state:
+    st.session_state.eda_results = None
+if 'current_page' not in st.session_state:
+    st.session_state.current_page = "📤 Upload"
+
+# Sidebar navigation
+def sidebar_navigation():
+    with st.sidebar:
+        st.image("https://streamlit.io/images/brand/streamlit-logo-primary-colormark-lighttext.png", width=150)
+        st.markdown("---")
+        
+        # Navigation buttons
+        pages = ["📤 Upload", "📊 EDA", "🤖 Modeling", "📄 Report"]
+        for page in pages:
+            if st.button(page, key=f"nav_{page}", use_container_width=True):
+                st.session_state.current_page = page
+                st.rerun()
+        
+        st.markdown("---")
+        
+        # Status indicators
+        if st.session_state.data is not None:
+            st.success(f"✅ Data Loaded: {st.session_state.data.shape[0]:,} rows")
+        else:
+            st.warning("⚠️ No data loaded")
+        
+        if st.session_state.model_results is not None:
+            st.success("✅ Models trained")
+        
+        # App info
+        st.markdown("---")
+        st.caption("Smart EDA & Auto-ML v1.0")
+        st.caption("Built with ❤️ using Streamlit")
+
+# Main app
+def main():
+    sidebar_navigation()
+    
+    # Page routing - import each page directly
+    if st.session_state.current_page == "📤 Upload":
+        from pages import upload
+        upload.show()
+    elif st.session_state.current_page == "📊 EDA":
+        from pages import eda
+        eda.show()
+    elif st.session_state.current_page == "🤖 Modeling":
+        from pages import modeling
+        modeling.show()
+    elif st.session_state.current_page == "📄 Report":
+        from pages import report
+        report.show()
+
+if __name__ == "__main__":
+    main()

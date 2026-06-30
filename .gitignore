@@ -1,0 +1,72 @@
+# Python
+venv/
+env/
+*.pyc
+__pycache__/
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+*.log
+
+# Data files
+*.csv
+*.xlsx
+*.xls
+*.db
+*.sqlite3
+*.sqlite
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Streamlit
+.streamlit/
+*.streamlit
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Reports generated
+reports/*.json
+reports/*.pdf
+reports/*.html
+
+# Dashboards
+dashboards/*.json
+
+# Data files
+data/*.csv
+data/*.xlsx
+
+# Secret keys
+*.pem
+*.key
+*.crt
+
+# Jupyter Notebooks
+.ipynb_checkpoints/
+*.ipynb
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+*.tmp
+*.temp
