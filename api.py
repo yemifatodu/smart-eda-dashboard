@@ -8,9 +8,9 @@ import logging
 
 from fastapi import FastAPI, HTTPException, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, conlist
+from pydantic import BaseModel, Field
 import pandas as pd
-from typing import Optional
+from typing import Optional, Annotated, List
 
 logger = logging.getLogger("smart_eda_api")
 
@@ -45,7 +45,7 @@ def require_api_key(x_api_key: Optional[str] = Header(default=None)):
 
 
 class AnalysisRequest(BaseModel):
-    data: conlist(dict, max_length=MAX_ROWS)
+    data: Annotated[List[dict], Field(max_length=MAX_ROWS)]
     analysis_type: str  # 'eda', 'correlation', 'statistics'
 
 
