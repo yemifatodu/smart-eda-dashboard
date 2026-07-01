@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import plotly.io as pio
 from utils.nlp_processor import NLPProcessor
+from utils.theme import quality_ring
 
 def show():
     st.markdown('<h1 class="main-header">💬 Natural Language Query</h1>', unsafe_allow_html=True)
@@ -13,21 +14,18 @@ def show():
     
     df = st.session_state.data
     nlp = NLPProcessor(df)
-    
+
+    # Floating assistant panel - AI features get their own bordered,
+    # elevated surface instead of sitting flush in the page, so the
+    # feature reads as "an assistant" rather than a plain form.
     st.markdown("""
-    ### 🤖 Ask Questions About Your Data
-    
-    **Try asking:**
-    - "Show me sales by region"
-    - "What factors affect profit?"
-    - "Top products by sales"
-    - "Trends over time"
-    - "Find anomalies"
-    - "Summarize my data"
-    - "Predict future sales"
-    """)
-    
-    st.markdown("---")
+    <div class="ai-panel">
+        <div class="ai-panel-header">🤖 Ask your data anything</div>
+        <div class="ai-panel-sub">Type a question, or pick a suggestion below - our analysis engine drafts an answer from your data.</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    st.markdown("<div style='height: 0.75rem'></div>", unsafe_allow_html=True)
     
     # Initialize session state for query
     if 'nlp_query_input' not in st.session_state:
@@ -35,10 +33,39 @@ def show():
     
     if 'nlp_response' not in st.session_state:
         st.session_state.nlp_response = None
+
+    # Quick suggestions as chips, shown above the input like the tone
+    # selector in the reference design - picking one both fills the intent
+    # and runs it immediately.
+    st.caption("Suggested for your data:")
+    suggestions = ["Summarize my data", "Find anomalies"]
+    if nlp.categorical_cols and nlp.numeric_cols:
+        suggestions.append(f"Show me {nlp.numeric_cols[0]} by {nlp.categorical_cols[0]}")
+    if len(nlp.numeric_cols) >= 2:
+        suggestions.append(f"What factors affect {nlp.numeric_cols[0]}?")
+    if nlp.categorical_cols:
+        suggestions.append(f"Top {nlp.categorical_cols[0]}")
+    if nlp.date_cols:
+        suggestions.append("Trends over time")
+    if len(nlp.numeric_cols) >= 1:
+        suggestions.append(f"Predict {nlp.numeric_cols[0]}")
+    suggestions = suggestions[:6]
+
+    chip_cols = st.columns(len(suggestions))
+    for idx, suggestion in enumerate(suggestions):
+        with chip_cols[idx]:
+            if st.button(suggestion, key=f"sugg_{idx}", use_container_width=True):
+                with st.spinner("Analyzing..."):
+                    response = nlp.process_query(suggestion)
+                    st.session_state.nlp_response = response
+                    st.session_state.last_query = suggestion
+                    st.rerun()
+
+    st.markdown("<div style='height: 0.5rem'></div>", unsafe_allow_html=True)
     
     # Query input - using a different key
     query = st.text_input(
-        "💬 Type your question here:",
+        "💬 Or type your own question:",
         placeholder="e.g., Show me sales by region",
         key="nlp_query_input"  # Changed key to avoid conflict
     )
@@ -98,27 +125,3 @@ def show():
         
         else:
             st.info(response['text'])
-    
-    # Quick suggestions
-    st.markdown("---")
-    st.subheader("💡 Quick Questions")
-    
-    suggestions = [
-        "Show me sales by category",
-        "What factors affect profit?",
-        "Top products by sales",
-        "Trends over time",
-        "Find anomalies",
-        "Summarize my data",
-        "Predict future sales"
-    ]
-    
-    cols = st.columns(4)
-    for idx, suggestion in enumerate(suggestions):
-        with cols[idx % 4]:
-            if st.button(suggestion, key=f"sugg_{idx}", use_container_width=True):
-                with st.spinner("Analyzing..."):
-                    response = nlp.process_query(suggestion)
-                    st.session_state.nlp_response = response
-                    st.session_state.last_query = suggestion
-                    st.rerun()

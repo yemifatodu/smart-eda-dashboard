@@ -86,6 +86,7 @@ def show():
             st.metric("Missing Values", f"{missing_pct:.1f}%")
         with col4:
             quality_score = calculate_quality_score(df)
+            st.session_state.data_quality_score = quality_score
             st.metric("Data Quality", f"{quality_score}%")
         
         # Data preview tabs

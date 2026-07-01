@@ -6,6 +6,7 @@ from sklearn.preprocessing import LabelEncoder
 import time
 from utils.model_trainer import ModelTrainer
 from utils.visualizer import Visualizer
+from utils.dtypes import is_categorical_series, categorical_columns
 
 def show():
     st.markdown('<h1 class="main-header">🤖 Auto-ML Modeling</h1>', unsafe_allow_html=True)
@@ -24,7 +25,7 @@ def show():
     with col1:
         # Detect potential target columns
         numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
-        categorical_cols = df.select_dtypes(include=['object', 'category']).columns.tolist()
+        categorical_cols = categorical_columns(df)
         
         # For classification, we can use categorical or binary numeric
         potential_targets = categorical_cols.copy()
@@ -77,7 +78,7 @@ def show():
         
         # Detect task type
         if task_type == "Auto-detect":
-            if y.dtype == 'object' or y.nunique() <= 10:
+            if is_categorical_series(y) or y.nunique() <= 10:
                 task_type = "Classification"
             else:
                 task_type = "Regression"

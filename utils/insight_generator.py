@@ -3,6 +3,7 @@ import numpy as np
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.preprocessing import LabelEncoder
 import warnings
+from utils.dtypes import categorical_columns, meaningful_numeric_columns
 warnings.filterwarnings('ignore')
 
 class InsightGenerator:
@@ -53,7 +54,7 @@ class InsightGenerator:
     
     def get_correlation_insights(self):
         """Find strong correlations"""
-        numeric_cols = self.df.select_dtypes(include=[np.number]).columns
+        numeric_cols = meaningful_numeric_columns(self.df)
         
         if len(numeric_cols) >= 2:
             corr = self.df[numeric_cols].corr()
@@ -76,8 +77,8 @@ class InsightGenerator:
     
     def get_business_insights(self):
         """Generate business-relevant insights"""
-        numeric_cols = self.df.select_dtypes(include=[np.number]).columns
-        categorical_cols = self.df.select_dtypes(include=['object', 'category']).columns
+        numeric_cols = meaningful_numeric_columns(self.df)
+        categorical_cols = categorical_columns(self.df)
         
         # Find highest and lowest values
         if len(numeric_cols) > 0:
@@ -120,7 +121,7 @@ class InsightGenerator:
     
     def get_outlier_insights(self):
         """Detect and explain outliers"""
-        numeric_cols = self.df.select_dtypes(include=[np.number]).columns
+        numeric_cols = meaningful_numeric_columns(self.df)
         
         for col in numeric_cols[:3]:
             Q1 = self.df[col].quantile(0.25)
@@ -141,22 +142,25 @@ class InsightGenerator:
     
     def get_recommendations(self):
         """Generate actionable recommendations"""
-        numeric_cols = self.df.select_dtypes(include=[np.number]).columns
+        numeric_cols = meaningful_numeric_columns(self.df)
         
         if len(numeric_cols) >= 2:
-            # Find the most "important" column (largest variance)
-            variances = self.df[numeric_cols].var()
-            most_variant = variances.idxmax()
-            
-            self.insights.append({
-                'type': 'recommendation',
-                'title': f'💡 Focus on {most_variant}',
-                'description': f'{most_variant} has the most variation in your data ({variances.max():.2f} variance).',
-                'recommendation': f'This is where you can have the biggest impact. Focus your analysis on {most_variant}.'
-            })
+            # Coefficient of variation (std/mean) instead of raw variance -
+            # raw variance unfairly favors columns with a large numeric
+            # range (like a sequential ID) over ones that are genuinely
+            # more variable relative to their own scale.
+            cv = (self.df[numeric_cols].std() / self.df[numeric_cols].mean().abs()).replace([np.inf, -np.inf], np.nan).dropna()
+            if len(cv) > 0:
+                most_variant = cv.idxmax()
+                self.insights.append({
+                    'type': 'recommendation',
+                    'title': f'💡 Focus on {most_variant}',
+                    'description': f'{most_variant} shows the most relative variation in your data (CV: {cv.max():.2f}).',
+                    'recommendation': f'This is where you can have the biggest impact. Focus your analysis on {most_variant}.'
+                })
         
         # Customer/segment recommendations
-        categorical_cols = self.df.select_dtypes(include=['object', 'category']).columns
+        categorical_cols = categorical_columns(self.df)
         if len(categorical_cols) > 0:
             most_diverse = max(categorical_cols, key=lambda x: self.df[x].nunique())
             

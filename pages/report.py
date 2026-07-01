@@ -4,9 +4,10 @@ import numpy as np  # ← ADDED
 import plotly.graph_objects as go
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
+from reportlab.lib.enums import TA_CENTER
 import io
 import base64
 from datetime import datetime
@@ -61,18 +62,15 @@ def show():
                 )
             
             with col2:
-                # Try to generate PDF
-                pdf_content = generate_pdf_report(html_content)
-                if pdf_content:
-                    st.download_button(
-                        label="📑 Download PDF Report",
-                        data=pdf_content,
-                        file_name="eda_report.pdf",
-                        mime="application/pdf",
-                        use_container_width=True
-                    )
-                else:
-                    st.warning("⚠️ PDF generation requires weasyprint. Install with: pip install weasyprint")
+                # Generate PDF (ReportLab - no native/GTK dependencies, works on Windows)
+                pdf_content = generate_pdf_report(report_data)
+                st.download_button(
+                    label="📑 Download PDF Report",
+                    data=pdf_content,
+                    file_name="eda_report.pdf",
+                    mime="application/pdf",
+                    use_container_width=True
+                )
             
             with col3:
                 st.button("🖨️ Print Report", on_click=lambda: st.markdown(
@@ -271,26 +269,137 @@ def generate_html_report(data):
     html += "</body></html>"
     return html
 
-def generate_pdf_report(html_content):
-    """Convert HTML to PDF"""
-    try:
-        from weasyprint import HTML
-        import tempfile
-        
-        with tempfile.NamedTemporaryFile(suffix='.html', delete=False) as f:
-            f.write(html_content.encode('utf-8'))
-            html_file = f.name
-        
-        pdf_file = tempfile.NamedTemporaryFile(suffix='.pdf', delete=False)
-        HTML(html_file).write_pdf(pdf_file.name)
-        
-        with open(pdf_file.name, 'rb') as f:
-            pdf_content = f.read()
-        
-        return pdf_content
-        
-    except ImportError:
-        return None
-    except Exception as e:
-        st.warning(f"PDF generation error: {str(e)}")
-        return None
+def generate_pdf_report(data):
+    """Build a PDF report with ReportLab (pure Python, no native GTK
+    dependency - this replaces the old weasyprint path which failed on
+    Windows with a 'libgobject-2.0-0' load error)."""
+    df = st.session_state.data
+    results = st.session_state.model_results
+
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter,
+                             topMargin=0.6*inch, bottomMargin=0.6*inch)
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle('ReportTitle', parent=styles['Title'], alignment=TA_CENTER)
+    section_style = ParagraphStyle('Section', parent=styles['Heading2'], spaceBefore=16, spaceAfter=8)
+    body_style = styles['BodyText']
+
+    story = []
+    story.append(Paragraph(data['title'], title_style))
+    story.append(Paragraph(f"Generated: {data['timestamp']}", body_style))
+    story.append(Paragraph(
+        f"Dataset: {data['data_shape'][0]:,} rows x {data['data_shape'][1]} columns", body_style))
+    story.append(Spacer(1, 0.2*inch))
+
+    def make_table(rows, col_widths=None):
+        t = Table(rows, colWidths=col_widths, repeatRows=1)
+        t.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2D5BFF')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 8),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#E4E7EC')),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#F7F8FA')]),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ]))
+        return t
+
+    if data['include_summary']:
+        story.append(Paragraph("Executive Summary", section_style))
+        story.append(Paragraph(
+            "This report provides an automated analysis of your dataset "
+            "using EDA and machine learning techniques.", body_style))
+
+        missing_pct = (df.isnull().sum().sum() / (df.shape[0] * df.shape[1])) * 100
+        duplicate_pct = (len(df) - len(df.drop_duplicates())) / len(df) * 100
+        quality_score = 100 - missing_pct * 0.5 - duplicate_pct * 0.3
+
+        story.append(Spacer(1, 0.1*inch))
+        story.append(make_table([
+            ['Metric', 'Value'],
+            ['Data Quality Score', f"{quality_score:.0f}%"],
+            ['Missing Values', f"{missing_pct:.1f}%"],
+            ['Duplicate Rows', f"{duplicate_pct:.1f}%"],
+        ], col_widths=[3*inch, 2*inch]))
+
+        numeric_cols = df.select_dtypes(include=['number']).columns
+        if len(numeric_cols) > 0:
+            story.append(Spacer(1, 0.15*inch))
+            story.append(Paragraph("Key Insights", styles['Heading3']))
+            for col in numeric_cols[:3]:
+                story.append(Paragraph(
+                    f"<b>{col}:</b> Mean = {df[col].mean():.2f}, Median = {df[col].median():.2f}",
+                    body_style))
+
+    if data['include_eda']:
+        story.append(Paragraph("Exploratory Data Analysis", section_style))
+        numeric_cols = df.select_dtypes(include=['number']).columns
+
+        if len(numeric_cols) >= 2:
+            story.append(Paragraph("Correlation Matrix", styles['Heading3']))
+            corr = df[numeric_cols].corr()
+            header = ['Feature'] + list(numeric_cols)
+            rows = [header]
+            for col1 in numeric_cols:
+                rows.append([col1] + [f"{corr.loc[col1, col2]:.2f}" for col2 in numeric_cols])
+            story.append(make_table(rows))
+            story.append(Spacer(1, 0.15*inch))
+
+        if len(numeric_cols) > 0:
+            story.append(Paragraph("Distribution Statistics", styles['Heading3']))
+            rows = [['Feature', 'Mean', 'Std', 'Min', 'Max']]
+            for col in numeric_cols:
+                rows.append([
+                    col, f"{df[col].mean():.2f}", f"{df[col].std():.2f}",
+                    f"{df[col].min():.2f}", f"{df[col].max():.2f}"
+                ])
+            story.append(make_table(rows))
+
+    if data['include_models'] and results:
+        story.append(PageBreak())
+        story.append(Paragraph("Auto-ML Results", section_style))
+        story.append(Paragraph(
+            "Model performance comparison and best-performing model.", body_style))
+
+        metrics_df = results['metrics_df']
+        header = list(metrics_df.columns)
+        rows = [header]
+        for _, row in metrics_df.iterrows():
+            rows.append([
+                f"{row[c]:.3f}" if isinstance(row[c], float) else str(row[c])
+                for c in header
+            ])
+        story.append(Spacer(1, 0.1*inch))
+        story.append(make_table(rows))
+
+        story.append(Spacer(1, 0.15*inch))
+        story.append(Paragraph(
+            f"<b>Best Model:</b> {results['best_model']} "
+            f"(Score: {results['best_score']:.3f})", body_style))
+
+        if results.get('feature_importance'):
+            story.append(Paragraph("Feature Importance", styles['Heading3']))
+            features = results['feature_importance']['features']
+            importance = results['feature_importance']['importance']
+            sorted_idx = np.argsort(importance)[::-1]
+            for i in sorted_idx[:10]:
+                story.append(Paragraph(
+                    f"<b>{features[i]}:</b> {importance[i]*100:.1f}%", body_style))
+
+    story.append(Paragraph("Recommendations", section_style))
+    for rec in [
+        "Data Quality: Focus on collecting more complete data to improve model accuracy",
+        "Feature Engineering: Consider creating new features for better insights",
+        "Model Selection: Use the best performing model for prediction tasks",
+    ]:
+        story.append(Paragraph(f"• {rec}", body_style))
+
+    story.append(Spacer(1, 0.3*inch))
+    story.append(Paragraph(
+        "Generated by Smart EDA & Auto-ML Dashboard",
+        ParagraphStyle('Footer', parent=styles['Normal'], alignment=TA_CENTER,
+                        textColor=colors.grey, fontSize=8)))
+
+    doc.build(story)
+    buffer.seek(0)
+    return buffer.getvalue()

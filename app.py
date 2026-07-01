@@ -12,32 +12,8 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for better styling
-st.markdown("""
-<style>
-.main-header {
-    font-size: 2.5rem;
-    color: #1f77b4;
-    text-align: center;
-    padding: 1rem 0;
-}
-.metric-card {
-    background-color: #f0f2f6;
-    padding: 1rem;
-    border-radius: 0.5rem;
-    border-left: 4px solid #1f77b4;
-}
-.stButton > button {
-    width: 100%;
-    background-color: #1f77b4;
-    color: white;
-}
-.stButton > button:hover {
-    background-color: #2c8cdb;
-    color: white;
-}
-</style>
-""", unsafe_allow_html=True)
+from utils.theme import inject_css, quality_ring
+inject_css()
 
 # Initialize session state
 if 'data' not in st.session_state:
@@ -88,7 +64,9 @@ def sidebar_navigation():
         st.markdown("---")
 
         if st.session_state.data is not None:
-            st.success(f"✅ Data Loaded: {st.session_state.data.shape[0]:,} rows")
+            score = st.session_state.get('data_quality_score', 85)
+            st.markdown(quality_ring(score, "Data Quality"), unsafe_allow_html=True)
+            st.caption(f"{st.session_state.data.shape[0]:,} rows · {st.session_state.data.shape[1]} columns")
         else:
             st.warning("⚠️ No data loaded")
 
@@ -103,22 +81,22 @@ def sidebar_navigation():
 # Single source of truth for page name -> module. Every entry here now points
 # at a real implementation, not a "🚧 being built" placeholder.
 ROUTES = {
-    "🔐 Login": "pages.auth",
-    "📤 Upload": "pages.upload",
-    "💬 Ask AI": "pages.nlp_query",
-    "📊 EDA": "pages.eda",
-    "🤖 Modeling": "pages.modeling",
-    "📄 Report": "pages.report",
-    "🚨 Anomaly": "pages.anomaly",
-    "📐 Dashboard": "pages.dashboard",
-    "🔍 Compare": "pages.comparison",
-    "📖 Story": "pages.storytelling",
-    "↩️ Undo/Redo": "pages.undo_redo",
-    "👥 Team": "pages.collaboration",
-    "🔗 Sources": "pages.data_sources",
-    "⏰ Scheduler": "pages.scheduler",
-    "👤 Profile": "pages.auth",
-    "💎 Upgrade": "pages.pricing",
+    "🔐 Login": "app_pages.auth",
+    "📤 Upload": "app_pages.upload",
+    "💬 Ask AI": "app_pages.nlp_query",
+    "📊 EDA": "app_pages.eda",
+    "🤖 Modeling": "app_pages.modeling",
+    "📄 Report": "app_pages.report",
+    "🚨 Anomaly": "app_pages.anomaly",
+    "📐 Dashboard": "app_pages.dashboard",
+    "🔍 Compare": "app_pages.comparison",
+    "📖 Story": "app_pages.storytelling",
+    "↩️ Undo/Redo": "app_pages.undo_redo",
+    "👥 Team": "app_pages.collaboration",
+    "🔗 Sources": "app_pages.data_sources",
+    "⏰ Scheduler": "app_pages.scheduler",
+    "👤 Profile": "app_pages.auth",
+    "💎 Upgrade": "app_pages.pricing",
 }
 
 

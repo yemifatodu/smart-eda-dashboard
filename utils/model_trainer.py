@@ -8,6 +8,7 @@ from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score, r2_score, mean_absolute_error, mean_squared_error
 from xgboost import XGBClassifier, XGBRegressor
 import time
+from utils.dtypes import is_categorical_series, categorical_columns
 
 class ModelTrainer:
     def __init__(self):
@@ -18,13 +19,13 @@ class ModelTrainer:
     
     def prepare_data(self, X, y, task_type='Classification'):
         X_processed = X.copy()
-        for col in X_processed.select_dtypes(include=['object', 'category']).columns:
+        for col in categorical_columns(X_processed):
             le = LabelEncoder()
             X_processed[col] = le.fit_transform(X_processed[col].astype(str))
             self.label_encoders[col] = le
         
         y_processed = y.copy()
-        if y_processed.dtype == 'object' or y_processed.dtype.name == 'category':
+        if is_categorical_series(y_processed):
             le = LabelEncoder()
             y_processed = le.fit_transform(y_processed)
             self.target_encoder = le
@@ -39,7 +40,7 @@ class ModelTrainer:
     def train_models(self, X, y, task_type='Auto-detect', test_size=0.2, random_state=42, cv_folds=5):
         # Auto-detect task type
         if task_type == 'Auto-detect':
-            if y.dtype == 'object' or y.dtype.name == 'category' or y.nunique() <= 10:
+            if is_categorical_series(y) or y.nunique() <= 10:
                 task_type = 'Classification'
             else:
                 task_type = 'Regression'

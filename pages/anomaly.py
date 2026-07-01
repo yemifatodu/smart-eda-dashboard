@@ -26,6 +26,8 @@ def show():
     
     # Select column to analyze
     selected_col = st.selectbox("Select column to analyze for anomalies", numeric_cols)
+    if 'id' in selected_col.lower():
+        st.caption("💡 ID-like columns are usually sequential and rarely contain real outliers — try a measured value like price, amount, or rating instead.")
     
     # Method selection
     method = st.selectbox(
@@ -96,7 +98,7 @@ def display_anomalies(df, result, col):
                                        "Anomaly Distribution"])
     
     # Main chart with anomalies highlighted
-    x = range(len(df))
+    x = list(range(len(df)))
     y = df[col].values
     
     fig.add_trace(

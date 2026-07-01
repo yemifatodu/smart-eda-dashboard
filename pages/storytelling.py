@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 from datetime import datetime
+from utils.dtypes import categorical_columns, meaningful_numeric_columns
 
 def show():
     st.markdown('<h1 class="main-header">📖 Data Storytelling</h1>', unsafe_allow_html=True)
@@ -37,15 +38,15 @@ def generate_story(df):
 
 def generate_title(df):
     # Generate a meaningful title
-    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    numeric_cols = meaningful_numeric_columns(df)
     if len(numeric_cols) > 0:
         main_col = numeric_cols[0]
         return f"📊 Analysis of {main_col}: What the Data Reveals"
     return "📊 Data Analysis: Key Insights and Findings"
 
 def generate_executive_summary(df):
-    numeric_cols = df.select_dtypes(include=[np.number]).columns
-    cat_cols = df.select_dtypes(include=['object', 'category']).columns
+    numeric_cols = meaningful_numeric_columns(df)
+    cat_cols = categorical_columns(df)
     
     summary = f"""
     Your dataset contains **{df.shape[0]:,} records** with **{df.shape[1]} attributes**.
@@ -67,8 +68,8 @@ def generate_executive_summary(df):
 
 def generate_key_findings(df):
     findings = []
-    numeric_cols = df.select_dtypes(include=[np.number]).columns
-    cat_cols = df.select_dtypes(include=['object', 'category']).columns
+    numeric_cols = meaningful_numeric_columns(df)
+    cat_cols = categorical_columns(df)
     
     # Find top performers
     if len(numeric_cols) > 0:
@@ -99,7 +100,7 @@ def generate_key_findings(df):
 
 def generate_insights(df):
     insights = []
-    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    numeric_cols = meaningful_numeric_columns(df)
     
     if len(numeric_cols) >= 2:
         # Find correlations
@@ -118,8 +119,9 @@ def generate_insights(df):
                         'suggestion': f'Consider how changes in {col1} affect {col2}'
                     })
     
-    # Distribution insights
-    for col in numeric_cols[:2]:
+    # Distribution insights - scan every meaningful numeric column, not
+    # just the first two, so skew in later columns doesn't get missed.
+    for col in numeric_cols:
         skew = df[col].skew()
         if abs(skew) > 1:
             direction = "right" if skew > 0 else "left"
@@ -133,8 +135,8 @@ def generate_insights(df):
 
 def generate_recommendations(df):
     recs = []
-    numeric_cols = df.select_dtypes(include=[np.number]).columns
-    cat_cols = df.select_dtypes(include=['object', 'category']).columns
+    numeric_cols = meaningful_numeric_columns(df)
+    cat_cols = categorical_columns(df)
     
     if len(numeric_cols) > 0:
         col = numeric_cols[0]
@@ -155,7 +157,7 @@ def generate_recommendations(df):
     return recs
 
 def generate_statistics(df):
-    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    numeric_cols = meaningful_numeric_columns(df)
     stats = {}
     
     for col in numeric_cols[:5]:
@@ -200,10 +202,13 @@ def display_story(story):
     
     # Insights
     st.markdown("### 💡 Key Insights")
-    for insight in story['insights']:
-        with st.expander(insight['title']):
-            st.write(insight['detail'])
-            st.caption(f"💡 {insight['suggestion']}")
+    if story['insights']:
+        for insight in story['insights']:
+            with st.expander(insight['title']):
+                st.write(insight['detail'])
+                st.caption(f"💡 {insight['suggestion']}")
+    else:
+        st.caption("No strong correlations or skewed distributions were found — your numeric data looks fairly balanced.")
     
     # Recommendations
     st.markdown("### 🎯 Recommendations")

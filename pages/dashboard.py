@@ -154,7 +154,7 @@ def build_dashboard(df, manager):
             if st.button("💾 Save Dashboard", use_container_width=True):
                 save_current_dashboard(manager)
 
-def display_widget(df, widget):
+def display_widget(df, widget, idx=0):
     if widget['type'] == 'chart':
         # Create chart based on type
         if widget['chart_type'] == 'Bar':
@@ -169,7 +169,9 @@ def display_widget(df, widget):
             fig = px.box(df, x=widget['x_col'], y=widget['y_col'], title=widget['title'])
         
         fig.update_layout(height=300)
-        st.plotly_chart(fig, use_container_width=True)
+        # Unique key per widget position - without this, two widgets with the
+        # same chart type/columns/title collide with StreamlitDuplicateElementId.
+        st.plotly_chart(fig, use_container_width=True, key=f"dash_widget_chart_{idx}")
     
     elif widget['type'] == 'metric':
         # Calculate metric
@@ -190,7 +192,7 @@ def display_widget(df, widget):
         st.metric(widget['name'], f"{value:,.0f}")
     
     elif widget['type'] == 'table':
-        st.dataframe(df[widget['cols']].head(widget['rows']), use_container_width=True)
+        st.dataframe(df[widget['cols']].head(widget['rows']), use_container_width=True, key=f"dash_widget_table_{idx}")
     
     elif widget['type'] == 'text':
         if widget['text_type'] == 'Heading':
@@ -210,7 +212,7 @@ def view_dashboard(df):
         
         for idx, widget in enumerate(st.session_state.dashboard_widgets):
             with cols[idx % columns]:
-                display_widget(df, widget)
+                display_widget(df, widget, idx=idx)
     else:
         st.info("No widgets added yet. Go to 'Build Dashboard' tab to add widgets.")
 

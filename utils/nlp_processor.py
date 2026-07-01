@@ -4,27 +4,32 @@ import re
 from datetime import datetime
 import plotly.express as px
 import plotly.graph_objects as go
+from utils.dtypes import categorical_columns
 
 class NLPProcessor:
     def __init__(self, df):
         self.df = df
         self.numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
-        self.categorical_cols = df.select_dtypes(include=['object', 'category']).columns.tolist()
+        self.categorical_cols = categorical_columns(df)
         self.date_cols = df.select_dtypes(include=['datetime64']).columns.tolist()
     
     def process_query(self, query):
         # Process natural language query and return response
         query_lower = query.lower()
         
-        # Intent detection
-        if any(word in query_lower for word in ['summary', 'overview', 'describe', 'tell me about']):
+        # Intent detection. NOTE: these use word *stems* (e.g. 'summar'
+        # instead of 'summary') on purpose - a plain substring check on the
+        # full word misses common phrasings like "summarize" (doesn't
+        # contain "summary") or "anomalies" (doesn't contain "anomaly"),
+        # which silently fell through to the generic fallback response.
+        if any(word in query_lower for word in ['summar', 'overview', 'describe', 'tell me about']):
             return self.generate_summary()
         
         elif any(word in query_lower for word in ['show', 'display', 'plot', 'chart', 'graph']) and \
              any(word in query_lower for word in ['by', 'group', 'per', 'for each']):
             return self.generate_grouped_chart(query_lower)
         
-        elif any(word in query_lower for word in ['correlation', 'related', 'affect', 'impact', 'factor']):
+        elif any(word in query_lower for word in ['correlat', 'relat', 'affect', 'impact', 'factor']):
             return self.generate_correlation_analysis(query_lower)
         
         elif any(word in query_lower for word in ['top', 'best', 'highest', 'most', 'maximum']):
@@ -33,7 +38,7 @@ class NLPProcessor:
         elif any(word in query_lower for word in ['trend', 'over time', 'timeline', 'growth']):
             return self.generate_time_analysis(query_lower)
         
-        elif any(word in query_lower for word in ['anomaly', 'outlier', 'unusual', 'strange', 'weird']):
+        elif any(word in query_lower for word in ['anomal', 'outlier', 'unusual', 'strange', 'weird']):
             return self.generate_anomaly_detection(query_lower)
         
         elif any(word in query_lower for word in ['predict', 'forecast', 'future']):
