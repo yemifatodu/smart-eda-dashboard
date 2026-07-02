@@ -12,8 +12,25 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-from utils.theme import inject_css, quality_ring
+from utils.theme import inject_css, quality_ring, icon
 inject_css()
+
+# Maps our custom SVG icon names (used in markdown/headers via utils.theme)
+# to Streamlit's built-in Material Symbols names (used in st.button's icon=
+# param, since button labels can't render custom HTML/SVG - only plain
+# text or Streamlit's native emoji/:material/ syntax).
+_MATERIAL_ICON_MAP = {
+    "upload": "upload",
+    "message-circle": "forum",
+    "bar-chart": "bar_chart",
+    "brain": "psychology",
+    "alert-triangle": "warning",
+    "book-open": "auto_stories",
+    "layout-dashboard": "dashboard",
+    "file-text": "description",
+    "user": "person",
+    "gem": "diamond",
+}
 
 # Initialize session state
 if 'data' not in st.session_state:
@@ -25,40 +42,45 @@ if 'model_results' not in st.session_state:
 if 'eda_results' not in st.session_state:
     st.session_state.eda_results = None
 if 'current_page' not in st.session_state:
-    st.session_state.current_page = "📤 Upload"
+    st.session_state.current_page = "Upload"
 
-# Every page button shown in the sidebar maps 1:1 to a branch in ROUTES below.
-# If you add a page, add it to BOTH this list and ROUTES — that mismatch
-# (button existed but routing branch didn't, or vice versa) was the root
-# cause of "Anomaly / Team / Sources" being unreachable before this fix.
+# CORE NAV: the launch-scope feature set. Team Collaboration, Undo/Redo,
+# Scheduler, and multi-source Data Sources are intentionally NOT in the
+# launch nav - they exist in app_pages/ and still work if you want them
+# back, but a smaller set of well-polished features reads more premium
+# than a large set of thin ones. Each entry: (label, icon_name, route).
 NAV_PAGES = [
-    "🔐 Login",
-    "📤 Upload",
-    "💬 Ask AI",
-    "📊 EDA",
-    "🤖 Modeling",
-    "📄 Report",
-    "🚨 Anomaly",
-    "📐 Dashboard",
-    "🔍 Compare",
-    "📖 Story",
-    "↩️ Undo/Redo",
-    "👥 Team",
-    "🔗 Sources",
-    "⏰ Scheduler",
-    "👤 Profile",
-    "💎 Upgrade",
+    ("Upload",    "upload",           "app_pages.upload"),
+    ("Ask AI",    "message-circle",   "app_pages.nlp_query"),
+    ("EDA",       "bar-chart",        "app_pages.eda"),
+    ("Predict",   "brain",            "app_pages.modeling"),
+    ("Anomaly",   "alert-triangle",   "app_pages.anomaly"),
+    ("Story",     "book-open",        "app_pages.storytelling"),
+    ("Dashboard", "layout-dashboard", "app_pages.dashboard"),
+    ("Report",    "file-text",        "app_pages.report"),
+    ("Profile",   "user",             "app_pages.auth"),
+    ("Upgrade",   "gem",              "app_pages.pricing"),
 ]
+ROUTES = {label: route for label, _, route in NAV_PAGES}
 
 
 def sidebar_navigation():
     with st.sidebar:
-        st.image("https://streamlit.io/images/brand/streamlit-logo-primary-colormark-lighttext.png", width=150)
+        # Real product identity instead of the default Streamlit brand logo.
+        st.markdown(f"""
+        <div style="display:flex; align-items:center; gap:0.5rem; padding: 0.5rem 0 1rem 0;">
+            {icon('bar-chart', size=26, color='#2D5BFF')}
+            <span style="font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:1.15rem; color:#F2EEF7;">
+                Smart EDA
+            </span>
+        </div>
+        """, unsafe_allow_html=True)
         st.markdown("---")
 
-        for page in NAV_PAGES:
-            if st.button(page, key=f"nav_{page}", use_container_width=True):
-                st.session_state.current_page = page
+        for label, icon_name, _ in NAV_PAGES:
+            if st.button(f"{label}", key=f"nav_{label}", use_container_width=True,
+                         icon=f":material/{_MATERIAL_ICON_MAP.get(icon_name, 'circle')}:"):
+                st.session_state.current_page = label
                 st.rerun()
 
         st.markdown("---")
@@ -68,40 +90,47 @@ def sidebar_navigation():
             st.markdown(quality_ring(score, "Data Quality"), unsafe_allow_html=True)
             st.caption(f"{st.session_state.data.shape[0]:,} rows · {st.session_state.data.shape[1]} columns")
         else:
-            st.warning("⚠️ No data loaded")
+            st.caption("No data loaded yet")
 
         if st.session_state.model_results is not None:
-            st.success("✅ Models trained")
+            st.caption("✓ Models trained")
 
         st.markdown("---")
         st.caption("Smart EDA & Auto-ML v1.0")
-        st.caption("Built with ❤️ using Streamlit")
 
 
-# Single source of truth for page name -> module. Every entry here now points
-# at a real implementation, not a "🚧 being built" placeholder.
-ROUTES = {
-    "🔐 Login": "app_pages.auth",
-    "📤 Upload": "app_pages.upload",
-    "💬 Ask AI": "app_pages.nlp_query",
-    "📊 EDA": "app_pages.eda",
-    "🤖 Modeling": "app_pages.modeling",
-    "📄 Report": "app_pages.report",
-    "🚨 Anomaly": "app_pages.anomaly",
-    "📐 Dashboard": "app_pages.dashboard",
-    "🔍 Compare": "app_pages.comparison",
-    "📖 Story": "app_pages.storytelling",
-    "↩️ Undo/Redo": "app_pages.undo_redo",
-    "👥 Team": "app_pages.collaboration",
-    "🔗 Sources": "app_pages.data_sources",
-    "⏰ Scheduler": "app_pages.scheduler",
-    "👤 Profile": "app_pages.auth",
-    "💎 Upgrade": "app_pages.pricing",
-}
+def show_empty_state():
+    """First-run onboarding instead of a blank warning message - this is
+    what a person sees the very first time they open the app, so it
+    matters more than almost any other screen for perceived quality."""
+    st.markdown(f"""
+    <div style="text-align:center; padding: 3rem 1rem 1rem 1rem;">
+        {icon('upload', size=48, color='#2D5BFF')}
+        <h2 style="font-family:'Space Grotesk',sans-serif; margin-top:1rem;">Let's look at your data</h2>
+        <p style="color:#6B7280; max-width:420px; margin: 0.5rem auto 1.5rem auto;">
+            Upload a CSV or Excel file, or try one of our sample datasets to see what Smart EDA can do.
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("Upload my own file", use_container_width=True, type="primary", icon=":material/upload_file:"):
+            st.session_state.current_page = "Upload"
+            st.rerun()
+    with col2:
+        if st.button("Try a sample dataset", use_container_width=True, icon=":material/inventory_2:"):
+            st.session_state.current_page = "Upload"
+            st.rerun()
+    st.caption("Sample datasets (Superstore, Iris) are one click away on the Upload page.")
 
 
 def main():
     sidebar_navigation()
+
+    if st.session_state.data is None and st.session_state.current_page not in ("Upload", "Profile", "Upgrade"):
+        show_empty_state()
+        return
 
     module_path = ROUTES.get(st.session_state.current_page)
     if module_path is None:
